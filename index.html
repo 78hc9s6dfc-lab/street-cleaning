@@ -1,0 +1,480 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Street cleaning</title>
+<meta name="theme-color" content="#0b4ea2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Street cleaning">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root{
+  --blue:#0b4ea2; --red:#c8102e; --orange:#ff8c00; --yellow:#f2c200; --later:#0b4ea2;
+  --ink:#15181b; --plate:#ffffff; --muted:#5b6670; --rule:#15181b; --soft:#eef1f4;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --ink:#eef1f4; --plate:#1b2024; --muted:#a2acb5; --rule:#d5dbe0; --soft:#262c31; --later:#5d93e0; }
+}
+:root[data-theme="dark"]{ --ink:#eef1f4; --plate:#1b2024; --muted:#a2acb5; --rule:#d5dbe0; --soft:#262c31; --later:#5d93e0; }
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;overflow:hidden}
+body{font-family:"Overpass",-apple-system,"Helvetica Neue",Arial,sans-serif;color:var(--ink);background:var(--plate);
+  font-variant-numeric:tabular-nums;-webkit-tap-highlight-color:transparent;font-size:15px;line-height:1.35}
+#map{position:fixed;inset:0;background:var(--soft)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
+
+.search{position:fixed;z-index:500;left:10px;right:70px;top:calc(env(safe-area-inset-top,0px) + 10px)}
+.search input{width:100%;font:inherit;font-size:16px;padding:11px 14px;border:2px solid var(--rule);border-radius:10px;
+  background:var(--plate);color:var(--ink)}
+.search ul{list-style:none;margin:6px 0 0;padding:4px;background:var(--plate);border:2px solid var(--rule);border-radius:10px;max-height:46vh;overflow:auto}
+.search ul:empty{display:none}
+.search li button{display:block;width:100%;text-align:left;background:none;border:0;padding:10px;border-radius:6px}
+.search li button:active{background:var(--soft)}
+.search small{color:var(--muted)}
+
+.fabs{position:fixed;z-index:500;right:10px;top:calc(env(safe-area-inset-top,0px) + 10px);display:flex;flex-direction:column;gap:10px}
+.fab{width:50px;height:50px;border-radius:50%;border:2px solid var(--rule);background:var(--plate);display:grid;place-items:center;padding:0}
+.fab svg{width:24px;height:24px}
+.fab.on{background:var(--blue);border-color:var(--blue);color:#fff}
+
+.sheet{position:fixed;z-index:600;left:8px;right:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);background:var(--plate);
+  border:2px solid var(--rule);border-radius:14px;max-height:64vh;display:flex;flex-direction:column}
+.grip{border:0;background:none;padding:8px 0 2px;width:100%}
+.grip span{display:block;width:40px;height:5px;border-radius:3px;background:var(--muted);opacity:.5;margin:auto}
+.body{overflow:auto;padding:4px 16px 14px;-webkit-overflow-scrolling:touch}
+h1{font-size:19px;font-weight:800;margin:0 0 2px;letter-spacing:-.01em}
+.sub{color:var(--muted);font-size:14px;margin:0}
+.row{display:flex;gap:8px;align-items:center;overflow-x:auto;padding:8px 0 2px;scrollbar-width:none}
+.row::-webkit-scrollbar{display:none}
+.row b{font-weight:600;min-width:38px;color:var(--muted);font-size:14px}
+.chip{flex:none;border:2px solid var(--rule);background:var(--plate);border-radius:7px;padding:6px 11px;font-weight:600;font-size:15px}
+.chip[aria-pressed="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
+.chip:disabled{opacity:.3}
+.legend{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;margin:12px 0 4px;font-size:14px}
+.legend span{display:flex;align-items:center;gap:8px}
+.legend i{flex:none;width:22px;height:6px;border-radius:3px}
+.foot{color:var(--muted);font-size:12px;margin-top:10px}
+.foot a{color:inherit}
+.sheet.min .full{display:none}
+
+.back{border:0;background:none;padding:4px 0 8px;font-weight:600;color:var(--blue)}
+:root[data-theme="dark"] .back{color:var(--later)}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .back{color:var(--later)} }
+.seg{border-left:6px solid var(--later);padding:2px 0 2px 12px;margin:0 0 16px}
+.plate{display:inline-block;background:var(--blue);color:#fff;font-weight:800;font-size:17px;padding:3px 10px 1px;border-radius:6px;
+  box-shadow:0 0 0 2px var(--blue),0 0 0 3.5px #fff inset}
+.dist{color:var(--muted);font-size:13px;margin-left:6px}
+.when{font-size:17px;font-weight:800;margin:8px 0 0}
+.count{font-weight:600}
+.cat-active .count{color:var(--red)}
+.facts{margin:8px 0 0;display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:14px}
+.facts dt{color:var(--muted)}
+.facts dd{margin:0}
+.warn{background:var(--yellow);color:#15181b;border-radius:6px;padding:4px 8px;font-size:13px;font-weight:600;display:inline-block;margin-top:6px}
+.acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.btn{border:2px solid var(--rule);background:var(--plate);border-radius:8px;padding:8px 12px;font-weight:600;font-size:14px;text-decoration:none;color:var(--ink)}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.msg{font-size:14px;margin:6px 0 0;color:var(--muted)}
+.loading{position:fixed;inset:0;display:grid;place-items:center;z-index:900;background:var(--plate);font-weight:600}
+.leaflet-container{font-family:inherit;background:var(--soft)}
+@media (prefers-reduced-motion: reduce){*{scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div id="map" aria-label="Map of street cleaning days"></div>
+<div class="loading" id="loading">Loading street data</div>
+
+<div class="search">
+  <input id="q" type="search" placeholder="Search street" autocomplete="off" aria-label="Search street">
+  <ul id="results"></ul>
+</div>
+
+<div class="fabs">
+  <button class="fab" id="locate" aria-label="Show my location">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="6.5"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+  </button>
+  <button class="fab" id="park" aria-label="Parked here">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 20V4h5.2a4.3 4.3 0 0 1 0 8.6H8"/></svg>
+  </button>
+</div>
+
+<section class="sheet" id="sheet" aria-live="polite">
+  <button class="grip" id="grip" aria-label="Expand or collapse panel"><span></span></button>
+  <div class="body" id="body"></div>
+</section>
+
+<script>
+(() => {
+const MS_H = 36e5;
+const FROM = [[0,'Now'],[1,'1 h'],[3,'3 h'],[6,'6 h'],[12,'12 h'],[24,'1 d'],[48,'2 d']];
+const TO = [[1,'1 h'],[3,'3 h'],[6,'6 h'],[12,'12 h'],[24,'1 d'],[48,'2 d'],[72,'3 d'],[144,'6 d'],[168,'7 d']];
+const COL = {active:'var(--red)', window:'var(--orange)', soon:'var(--yellow)', later:'var(--later)'};
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+let win = store.get('win', {from:0, to:24});
+let rows = [], stamp = '', parked = store.get('parked', null);
+let view = 'filter', detailRows = [], detailTitle = '';
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+/* ---------- map ---------- */
+const dark = matchMedia('(prefers-color-scheme: dark)');
+const map = L.map('map', {zoomControl:false, attributionControl:false, preferCanvas:true}).setView([59.3293, 18.0686], 13);
+const renderer = L.canvas({padding:0.3, tolerance:0});
+let tiles;
+function setTiles(){
+  if (tiles) map.removeLayer(tiles);
+  const style = dark.matches ? 'dark_all' : 'light_all';
+  tiles = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png`, {subdomains:'abcd', maxZoom:20, detectRetina:true}).addTo(map);
+  tiles.bringToBack();
+  if (rows.length) restyle(true);
+}
+setTiles();
+dark.addEventListener?.('change', setTiles);
+const selLayer = L.layerGroup().addTo(map);
+const meLayer = L.layerGroup().addTo(map);
+const parkLayer = L.layerGroup().addTo(map);
+
+/* ---------- data ---------- */
+const WD = {'söndag':0,'måndag':1,'tisdag':2,'onsdag':3,'torsdag':4,'fredag':5,'lördag':6};
+function dec(a){ const o=[]; let x=0,y=0; for(let i=0;i<a.length;i+=2){ x+=a[i]; y+=a[i+1]; o.push([y/1e5, x/1e5]); } return o; }
+function finish(o){
+  o.vfD = o.vf ? new Date(o.vf) : null; o.vtD = o.vt ? new Date(o.vt) : null;
+  let a=90,b=180,c=-90,d=-180;
+  for (const l of o.lines) for (const [la,ln] of l){ if(la<a)a=la; if(ln<b)b=ln; if(la>c)c=la; if(ln>d)d=ln; }
+  o.bb = [a,b,c,d]; return o;
+}
+function normalize(j){
+  if (j.f){
+    const t = j.t; stamp = j.stamp || '';
+    return j.f.map(r => finish({street:t.street[r[0]], dist:t.dist[r[1]], type:t.type[r[2]], rate:t.rate[r[3]], wd:r[4], st:r[5], et:r[6],
+      per:r[7]||null, oe:r[8], vf:r[9], vt:r[10], meter:r[11], pl:r[12], ref:r[13], lines:r[14].map(dec)}));
+  }
+  stamp = j.timeStamp || '';
+  return j.features.filter(f => WD[f.properties.START_WEEKDAY] !== undefined).map(f => {
+    const p = f.properties, g = f.geometry, m = /BeslutadAr=(\d+)&LopNr=(\d+)/.exec(p.RDT_URL || '');
+    const ls = g.type === 'LineString' ? [g.coordinates] : g.coordinates;
+    return finish({street:p.STREET_NAME||'', dist:p.CITY_DISTRICT||p.PARKING_DISTRICT||'', type:p.VF_PLATS_TYP||'', rate:p.PARKING_RATE||'',
+      wd:WD[p.START_WEEKDAY], st:p.START_TIME, et:p.END_TIME, per:p.START_MONTH?[p.START_MONTH,p.START_DAY,p.END_MONTH,p.END_DAY]:null,
+      oe:({'jämna veckor':2,'udda veckor':1})[p.ODD_EVEN]||0, vf:p.VALID_FROM||'', vt:p.VALID_TO||'', meter:p.VF_METER||0, pl:p.VF_PLATSER||0,
+      ref:m?m[1]+'-'+m[2]:'', lines:ls.map(l => l.map(c => [c[1], c[0]]))});
+  });
+}
+
+/* ---------- schedule ---------- */
+function isoWeek(d){ const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); const day=t.getUTCDay()||7;
+  t.setUTCDate(t.getUTCDate()+4-day); const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1)); return Math.ceil(((t-y0)/864e5+1)/7); }
+function inPeriod(per, d){ if(!per) return true; const md=(d.getMonth()+1)*100+d.getDate(), s=per[0]*100+per[1], e=per[2]*100+per[3];
+  return s<=e ? (md>=s && md<=e) : (md>=s || md<=e); }
+function easter(y){ const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),
+  h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),n=h+l-7*m+114;
+  return new Date(y, Math.floor(n/31)-1, (n%31)+1); }
+const hcache = {};
+function holidayName(d){
+  const y = d.getFullYear();
+  if (!hcache[y]){
+    const E = easter(y), add = n => new Date(E.getFullYear(), E.getMonth(), E.getDate()+n);
+    let mid; for (let x=19; x<=25; x++){ const t=new Date(y,5,x); if (t.getDay()===5) mid=t; }
+    const list = [[new Date(y,0,1),"New Year's Day"],[new Date(y,0,6),'Epiphany'],[add(-2),'Good Friday'],[add(1),'Easter Monday'],
+      [new Date(y,4,1),'May Day'],[add(39),'Ascension Day'],[new Date(y,5,6),'National Day'],[mid,'Midsummer Eve'],
+      [new Date(y,11,24),'Christmas Eve'],[new Date(y,11,25),'Christmas Day'],[new Date(y,11,26),'Boxing Day'],[new Date(y,11,31),"New Year's Eve"]];
+    hcache[y] = Object.fromEntries(list.map(([t,n]) => [t.toDateString(), n]));
+  }
+  return hcache[y][d.toDateString()];
+}
+function nextOcc(r, now){
+  const base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const off = (r.wd - base.getDay() + 7) % 7;
+  for (let i=0; i<60; i++){
+    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate()+off+7*i);
+    const s = new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(r.st/100), r.st%100);
+    const e = new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(r.et/100), r.et%100);
+    if (r.vtD && s >= r.vtD) return null;
+    if (r.vfD && e <= r.vfD) continue;
+    if (!inPeriod(r.per, d)) continue;
+    if (r.oe && ((isoWeek(d)%2===0) !== (r.oe===2))) continue;
+    if (e > now) return {s, e, hol: holidayName(d)};
+  }
+  return null;
+}
+function classify(r, now){
+  const n = r.next = nextOcc(r, now);
+  if (!n) return 'later';
+  if (n.s <= now) return 'active';
+  const dh = (n.s - now) / MS_H;
+  if (dh < win.from) return 'soon';
+  if (dh <= win.to) return 'window';
+  return 'later';
+}
+
+/* ---------- render ---------- */
+const STY = {
+  active:{weight:6, opacity:1},
+  window:{weight:5, opacity:1},
+  soon:{weight:4, opacity:.95},
+  later:{weight:3, opacity:.45}
+};
+let counts = {};
+function restyle(force){
+  const now = new Date(); counts = {active:0, window:0, soon:0, later:0};
+  const colors = {active:cssVar('--red'), window:cssVar('--orange'), soon:cssVar('--yellow'), later:cssVar('--later')};
+  for (const r of rows){
+    const c = classify(r, now); counts[c]++;
+    if (force || c !== r.cat){
+      r.cat = c;
+      r.layer.setStyle({color:colors[c], ...STY[c]});
+      if (c === 'active' || c === 'window') r.layer.bringToFront();
+    }
+  }
+  render();
+}
+
+/* ---------- formatting ---------- */
+const pad = n => String(n).padStart(2,'0');
+const hm = t => pad(Math.floor(t/100)) + ':' + pad(t%100);
+const dayStr = d => `${DAYS[d.getDay()].slice(0,3)} ${d.getDate()} ${MON[d.getMonth()]}`;
+function until(ms){
+  const m = Math.round(ms/6e4);
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m/60);
+  if (h < 24) return `${h} h ${m%60} min`;
+  return `${Math.floor(h/24)} d ${h%24} h`;
+}
+function ruleText(r){
+  let t = `Every ${DAYS[r.wd]} ${hm(r.st)} to ${hm(r.et)}`;
+  if (r.oe) t += r.oe === 2 ? ', even weeks' : ', odd weeks';
+  if (r.per) t += `, ${r.per[1]} ${MON[r.per[0]-1]} to ${r.per[3]} ${MON[r.per[2]-1]}`;
+  else t += ', all year';
+  return t;
+}
+const rdt = ref => { const [y,n] = ref.split('-'); return `https://rdt.transportstyrelsen.se/rdt/AF06_View.aspx?BeslutsMyndighetKod=0180&BeslutadAr=${y}&LopNr=${n}`; };
+const hourLabel = h => (FROM.find(x=>x[0]===h) || TO.find(x=>x[0]===h) || [0,h+' h'])[1];
+
+/* ---------- views ---------- */
+function render(){ view === 'filter' ? renderFilter() : renderDetail(); }
+function chips(list, key){
+  return list.map(([h,l]) => {
+    const dis = key==='to' ? h <= win.from : h >= win.to;
+    return `<button class="chip" data-k="${key}" data-h="${h}" aria-pressed="${win[key]===h}" ${dis?'disabled':''}>${l}</button>`;
+  }).join('');
+}
+function renderFilter(){
+  const parkedHtml = parked ? `<p class="msg">Car parked ${dayStr(new Date(parked.t))} ${pad(new Date(parked.t).getHours())}:${pad(new Date(parked.t).getMinutes())}. <button class="back" data-act="showpark" style="padding:0">Show cleaning times</button></p>` : '';
+  $('body').innerHTML = `
+    <h1>${counts.window} stretches cleaned ${win.from ? 'from ' + hourLabel(win.from) : 'from now'} to ${hourLabel(win.to)}</h1>
+    <p class="sub">${counts.active ? counts.active + ' with parking ban in force now' : 'No parking ban in force right now'}</p>
+    ${parkedHtml}
+    <div class="full">
+      <div class="row"><b>From</b>${chips(FROM,'from')}</div>
+      <div class="row"><b>To</b>${chips(TO,'to')}</div>
+      <div class="legend">
+        <span><i style="background:${COL.active}"></i>Ban in force now</span>
+        <span><i style="background:${COL.window}"></i>Starts in your window</span>
+        <span><i style="background:${COL.soon}"></i>Starts before window</span>
+        <span><i style="background:${COL.later};opacity:.5"></i>Later</span>
+      </div>
+      <p class="foot">Tap any street for times, taxa and regulation. Data from Stockholms stad, ${stamp ? stamp.slice(0,10) : 'date unknown'}. Always check the sign on site.<br>
+      Map © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, © <a href="https://carto.com/attributions">CARTO</a></p>
+    </div>`;
+}
+function segHtml(r, now, extra){
+  const n = r.next, c = r.cat;
+  let when, cnt;
+  if (!n){ when = 'No upcoming cleaning found'; cnt = ''; }
+  else if (c === 'active'){ when = `Ban in force until ${hm(r.et)}`; cnt = `Ends in ${until(n.e - now)}`; }
+  else { when = `${dayStr(n.s)}, ${hm(r.st)} to ${hm(r.et)}`; cnt = `Starts in ${until(n.s - now)}`; }
+  const facts = [
+    ['Rule', ruleText(r)],
+    ['Parking', r.type || 'Not specified'],
+    ['Taxa', r.rate ? r.rate.charAt(0).toUpperCase() + r.rate.slice(1) : 'Not specified'],
+    r.meter ? ['Length', r.meter + ' m'] : null,
+    r.pl ? ['Spaces', r.pl] : null,
+    r.vt ? ['Valid until', new Date(r.vt).toLocaleDateString('en-GB')] : null
+  ].filter(Boolean);
+  return `<article class="seg cat-${c}" style="border-color:${COL[c]}">
+    <span class="plate">${esc(r.street || 'Unnamed street')}</span><span class="dist">${esc(r.dist)}</span>
+    <p class="when">${when}</p><p class="count sub">${cnt}${extra||''}</p>
+    ${n && n.hol ? `<span class="warn">${n.hol}: check the sign whether the ban applies</span>` : ''}
+    <dl class="facts">${facts.map(([k,v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+    <div class="acts">
+      ${n ? `<button class="btn primary" data-act="ics" data-i="${r.i}">Add reminder</button>` : ''}
+      <a class="btn" href="${rdt(r.ref)}" target="_blank" rel="noopener">Regulation ${esc(r.ref)}</a>
+    </div></article>`;
+}
+function renderDetail(){
+  const now = new Date();
+  $('body').innerHTML = `<button class="back" data-act="back">Back to filter</button>
+    ${detailTitle ? `<h1>${detailTitle}</h1><p class="sub" style="margin-bottom:12px">Each side of a street can have its own day</p>` : ''}
+    ${detailRows.length ? detailRows.map(r => segHtml(r, now, (r._d != null ? `, ${Math.round(r._d)} m away` : '') + (r._n > 1 ? `, applies to ${r._n} stretches` : ''))).join('') :
+      '<p class="msg">No cleaning stretches within 30 m. Move the pin closer to the curb or tap the street on the map.</p>'}`;
+}
+function openDetail(list, title){
+  view = 'detail'; detailRows = list; detailTitle = title || '';
+  $('sheet').classList.remove('min');
+  selLayer.clearLayers();
+  for (const r of list){
+    L.polyline(r.lines, {renderer, interactive:false, color:'#fff', weight:12, opacity:.9}).addTo(selLayer);
+    L.polyline(r.lines, {renderer, interactive:false, color:cssVar(r.cat==='later'?'--blue':({active:'--red',window:'--orange',soon:'--yellow'})[r.cat]), weight:7}).addTo(selLayer);
+  }
+  render(); $('body').scrollTop = 0;
+}
+function closeDetail(){ view = 'filter'; selLayer.clearLayers(); render(); }
+
+/* ---------- hit testing ---------- */
+function near(ll, meters){
+  const kx = Math.cos(ll.lat*Math.PI/180)*111320, ky = 110540;
+  const dLat = meters/ky, dLng = meters/kx, out = [];
+  for (const r of rows){
+    const b = r.bb;
+    if (ll.lat < b[0]-dLat || ll.lat > b[2]+dLat || ll.lng < b[1]-dLng || ll.lng > b[3]+dLng) continue;
+    let best = Infinity;
+    for (const l of r.lines) for (let i=1; i<l.length; i++){
+      const ax=(l[i-1][1]-ll.lng)*kx, ay=(l[i-1][0]-ll.lat)*ky, bx=(l[i][1]-ll.lng)*kx, by=(l[i][0]-ll.lat)*ky;
+      const dx=bx-ax, dy=by-ay, L2=dx*dx+dy*dy;
+      let t = L2 ? -(ax*dx+ay*dy)/L2 : 0; t = Math.max(0, Math.min(1, t));
+      const px=ax+t*dx, py=ay+t*dy, d=Math.hypot(px,py);
+      if (d < best) best = d;
+    }
+    if (best <= meters){ r._d = best; r._n = null; out.push(r); }
+  }
+  const rank = {active:0, window:1, soon:2, later:3};
+  return out.sort((a,b) => (a._d - b._d) || (rank[a.cat]-rank[b.cat])).slice(0, 8);
+}
+map.on('click', e => {
+  const mpp = 40075016.686*Math.cos(e.latlng.lat*Math.PI/180)/Math.pow(2, map.getZoom()+8);
+  const hits = near(e.latlng, Math.max(6, 18*mpp));
+  hits.forEach(r => r._d = null);
+  if (hits.length) openDetail(hits); else if (view === 'detail') closeDetail();
+  $('q').blur(); $('results').innerHTML = '';
+});
+
+/* ---------- search ---------- */
+let streets = [];
+$('q').addEventListener('input', () => {
+  const q = $('q').value.trim().toLowerCase();
+  if (q.length < 2){ $('results').innerHTML = ''; return; }
+  const m = streets.filter(s => s.k.includes(q)).sort((a,b) => (b.k.startsWith(q)) - (a.k.startsWith(q)) || a.k.localeCompare(b.k)).slice(0, 8);
+  $('results').innerHTML = m.map((s,i) => `<li><button data-s="${streets.indexOf(s)}">${esc(s.name)} <small>${esc(s.dists)}</small></button></li>`).join('')
+    || '<li><button disabled>No street matches</button></li>';
+});
+$('results').addEventListener('click', e => {
+  const b = e.target.closest('button[data-s]'); if (!b) return;
+  const s = streets[+b.dataset.s];
+  const list = rows.filter(r => r.street === s.name);
+  $('results').innerHTML = ''; $('q').value = s.name; $('q').blur();
+  const rank = {active:0,window:1,soon:2,later:3}, groups = new Map();
+  for (const r of list){
+    const k = [r.wd,r.st,r.et,r.per,r.oe,r.rate,r.type,r.dist].join('|');
+    if (!groups.has(k)) groups.set(k, {r, n:0}); groups.get(k).n++;
+  }
+  const cards = [...groups.values()].map(g => { g.r._d = null; g.r._n = g.n; return g.r; }).sort((a,b) => rank[a.cat]-rank[b.cat]);
+  openDetail(cards, `${esc(s.name)}: ${list.length} stretches, ${cards.length} distinct rules`);
+  L.polyline(list.flatMap(r => r.lines), {renderer, interactive:false, color:'#fff', weight:12, opacity:.9}).addTo(selLayer).bringToBack();
+  const bounds = L.latLngBounds(list.flatMap(r => r.lines.flat()));
+  map.fitBounds(bounds, {paddingTopLeft:[20,80], paddingBottomRight:[20, $('sheet').offsetHeight + 20], maxZoom:17});
+});
+
+/* ---------- location ---------- */
+let watchId = null, me = null, firstFix = false;
+$('locate').addEventListener('click', () => {
+  if (!('geolocation' in navigator)){ flash('Location is not available in this browser.'); return; }
+  if (me) map.setView(me, Math.max(map.getZoom(), 17));
+  if (watchId !== null) return;
+  $('locate').classList.add('on'); firstFix = true;
+  watchId = navigator.geolocation.watchPosition(p => {
+    me = L.latLng(p.coords.latitude, p.coords.longitude);
+    meLayer.clearLayers();
+    L.circle(me, {radius:p.coords.accuracy, renderer, interactive:false, color:'#0b4ea2', weight:1, fillOpacity:.08}).addTo(meLayer);
+    L.circleMarker(me, {radius:8, renderer, interactive:false, color:'#fff', weight:3, fillColor:'#0b4ea2', fillOpacity:1}).addTo(meLayer);
+    if (firstFix){ map.setView(me, 17); firstFix = false; }
+  }, err => {
+    $('locate').classList.remove('on'); watchId = null;
+    flash(err.code === 1 ? 'Location is blocked. Allow it in Settings, Privacy, Location Services, Safari Websites.' : 'Could not get your location. Try again outdoors.');
+  }, {enableHighAccuracy:true, maximumAge:10000, timeout:20000});
+});
+function flash(t){ if (view !== 'filter') closeDetail(); $('sheet').classList.remove('min'); $('body').insertAdjacentHTML('afterbegin', `<p class="msg" style="color:var(--red);margin:0 0 8px">${esc(t)}</p>`); }
+
+/* ---------- parked car ---------- */
+function drawPark(){
+  parkLayer.clearLayers(); $('park').classList.toggle('on', !!parked);
+  if (!parked) return;
+  L.marker([parked.lat, parked.lng], {interactive:false, icon:L.divIcon({className:'', iconSize:[30,30], iconAnchor:[15,15],
+    html:'<div style="width:30px;height:30px;border-radius:6px;background:#0b4ea2;color:#fff;font-weight:800;display:grid;place-items:center;border:2px solid #fff;font-family:Overpass,sans-serif">P</div>'})}).addTo(parkLayer);
+}
+function showParked(){
+  const ll = L.latLng(parked.lat, parked.lng);
+  map.setView(ll, Math.max(map.getZoom(), 17));
+  openDetail(near(ll, 30), 'Cleaning near your car');
+  $('body').insertAdjacentHTML('beforeend', '<div class="acts"><button class="btn" data-act="unpark">Clear parked car</button></div>');
+}
+$('park').addEventListener('click', () => {
+  if (parked){ showParked(); return; }
+  const ll = me || map.getCenter();
+  parked = {lat:ll.lat, lng:ll.lng, t:Date.now(), src: me ? 'gps' : 'map'};
+  store.set('parked', parked); drawPark(); showParked();
+  if (!me) $('body').insertAdjacentHTML('afterbegin', '<p class="msg" style="margin:0 0 8px">Saved at the map centre. Tap the location button first to use GPS.</p>');
+});
+
+/* ---------- calendar reminder ---------- */
+function icsDate(d){ return d.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,''); }
+function makeIcs(r){
+  const n = r.next, uid = `${r.ref}-${n.s.getTime()}@street-cleaning`;
+  const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//street-cleaning//EN','METHOD:PUBLISH','BEGIN:VEVENT',
+    `UID:${uid}`, `DTSTAMP:${icsDate(new Date())}`, `DTSTART:${icsDate(n.s)}`, `DTEND:${icsDate(n.e)}`,
+    `SUMMARY:Move car: street cleaning ${r.street}`, `LOCATION:${r.street}, ${r.dist}`,
+    `DESCRIPTION:${ruleText(r)}. Regulation 0180 ${r.ref}.`,
+    'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:Move car','TRIGGER:-PT12H','END:VALARM',
+    'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:Move car','TRIGGER:-PT1H','END:VALARM',
+    'END:VEVENT','END:VCALENDAR'];
+  const blob = new Blob([lines.join('\r\n')], {type:'text/calendar'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `street-cleaning-${r.street.replace(/\W+/g,'-')}.ics`;
+  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+}
+
+/* ---------- sheet events ---------- */
+$('body').addEventListener('click', e => {
+  const c = e.target.closest('.chip');
+  if (c){ win[c.dataset.k] = +c.dataset.h; store.set('win', win); restyle(); return; }
+  const a = e.target.closest('[data-act]'); if (!a) return;
+  const act = a.dataset.act;
+  if (act === 'back') closeDetail();
+  if (act === 'ics') makeIcs(rows[+a.dataset.i]);
+  if (act === 'showpark') showParked();
+  if (act === 'unpark'){ parked = null; store.set('parked', null); drawPark(); closeDetail(); }
+});
+$('grip').addEventListener('click', () => $('sheet').classList.toggle('min'));
+
+/* ---------- boot ---------- */
+fetch('data.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(j => {
+  rows = normalize(j);
+  rows.forEach((r,i) => { r.i = i; r.layer = L.polyline(r.lines, {renderer, interactive:false, lineCap:'round'}).addTo(map); });
+  const by = {};
+  for (const r of rows){ if (!r.street) continue; (by[r.street] ||= new Set()).add(r.dist); }
+  streets = Object.entries(by).map(([name, d]) => ({name, k:name.toLowerCase(), dists:[...d].slice(0,3).join(', ')}));
+  restyle(true); drawPark();
+  $('loading').remove();
+  setInterval(() => { restyle(); }, 60000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) restyle(); });
+}).catch(err => { $('loading').textContent = 'Street data failed to load (' + err.message + '). Check that data.json sits next to index.html.'; });
+
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js');
+})();
+</script>
+</body>
+</html>
