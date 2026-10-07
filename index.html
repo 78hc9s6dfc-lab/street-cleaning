@@ -73,7 +73,6 @@ h1{font-size:19px;font-weight:800;margin:0 0 2px;letter-spacing:-.01em}
 .msg{font-size:14px;margin:6px 0 0;color:var(--muted)}
 .loading{position:fixed;inset:0;display:grid;place-items:center;z-index:900;background:var(--plate);font-weight:600}
 .leaflet-container{font-family:inherit;background:var(--soft)}
-@media (prefers-color-scheme: dark){ .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.9) contrast(.85)} }
 .bar{display:flex;align-items:center;gap:8px;font-weight:600}
 .pick{position:relative}
 .pick select{appearance:none;-webkit-appearance:none;font:inherit;font-size:16px;font-weight:700;color:#fff;background:var(--blue);
@@ -134,7 +133,10 @@ const map = L.map('map', {zoomControl:false, attributionControl:false, preferCan
 const renderer = L.canvas({padding:0.3, tolerance:0});
 let tiles;
 function setTiles(){
-  if (!tiles) tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:20, maxNativeZoom:19}).addTo(map);
+  if (tiles) map.removeLayer(tiles);
+  const style = dark.matches ? 'alidade_smooth_dark' : 'alidade_smooth';
+  tiles = L.tileLayer(`https://tiles.stadiamaps.com/tiles/${style}/{z}/{x}/{y}{r}.png`, {maxZoom:20}).addTo(map);
+  tiles.bringToBack();
   if (rows.length) restyle(true);
 }
 setTiles();
@@ -275,7 +277,7 @@ function renderFilter(){
     </div>
     ${parked ? `<p class="msg">Car parked ${dayStr(pt)} ${pad(pt.getHours())}:${pad(pt.getMinutes())}. <button class="back" data-act="showpark" style="padding:0">Show cleaning times</button></p>` : ''}
     <div class="meta"><div><span><i style="background:${COL.active}"></i>Ban now</span><span><i style="background:${COL.window}"></i>In window</span></div>
-      <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap</a></div>`;
+      <span style="margin:0">© <a href="https://stadiamaps.com/">Stadia Maps</a> © <a href="https://openmaptiles.org/">OpenMapTiles</a> © <a href="https://www.openstreetmap.org/copyright">OSM</a></span></div>`;
 }
 function segHtml(r, now, extra){
   const n = r.next, c = r.cat;
