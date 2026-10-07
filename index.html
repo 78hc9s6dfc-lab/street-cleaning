@@ -15,17 +15,17 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
 :root{
-  --red:#d7263d; --orange:#ff8a1f; --later:#7d8fa3; --accent:#2f7cf6;
+  --red:#d7263d; --orange:#ff8a1f; --ok:#2e9e6b; --later:#7d8fa3; --accent:#2f7cf6;
   --bg:#f3f3f1; --ink:#2d3135; --muted:#80868c; --glass:rgba(255,255,255,.72); --glass-hi:rgba(255,255,255,.9);
   --edge:rgba(20,24,28,.08); --fill:rgba(20,24,28,.055); --shadow:0 6px 24px rgba(20,24,28,.12);
   --btn:#2d3135; --btn-ink:#fff;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){ --bg:#1f2023; --ink:#e7e9eb; --muted:#9aa1a8; --glass:rgba(38,40,44,.7); --glass-hi:rgba(38,40,44,.92);
-    --edge:rgba(255,255,255,.09); --fill:rgba(255,255,255,.08); --shadow:0 6px 24px rgba(0,0,0,.4); --later:#8a9bb0; --btn:#e7e9eb; --btn-ink:#1f2023; }
+    --edge:rgba(255,255,255,.09); --fill:rgba(255,255,255,.08); --shadow:0 6px 24px rgba(0,0,0,.4); --later:#8a9bb0; --ok:#43b883; --btn:#e7e9eb; --btn-ink:#1f2023; }
 }
 :root[data-theme="dark"]{ --bg:#1f2023; --ink:#e7e9eb; --muted:#9aa1a8; --glass:rgba(38,40,44,.7); --glass-hi:rgba(38,40,44,.92);
-  --edge:rgba(255,255,255,.09); --fill:rgba(255,255,255,.08); --shadow:0 6px 24px rgba(0,0,0,.4); --later:#8a9bb0; --btn:#e7e9eb; --btn-ink:#1f2023; }
+  --edge:rgba(255,255,255,.09); --fill:rgba(255,255,255,.08); --shadow:0 6px 24px rgba(0,0,0,.4); --later:#8a9bb0; --ok:#43b883; --btn:#e7e9eb; --btn-ink:#1f2023; }
 *{box-sizing:border-box}
 html,body{height:100%;margin:0;overflow:hidden}
 body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;color:var(--ink);background:var(--bg);
@@ -56,19 +56,22 @@ button{font:inherit;color:inherit;cursor:pointer}
 .sheet{position:fixed;z-index:600;left:12px;right:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);
   border-radius:18px;max-height:62vh;display:flex;flex-direction:column}
 .body{overflow:auto;padding:10px 12px;-webkit-overflow-scrolling:touch}
-.bar{display:flex;align-items:center;gap:6px}
+.bar{display:flex;align-items:center;gap:5px}
 .to{color:var(--muted);font-size:14px}
 .pick{position:relative}
 .pick select{appearance:none;-webkit-appearance:none;font:inherit;font-size:16px;font-weight:600;color:var(--ink);background:var(--fill);
-  border:0;border-radius:10px;padding:8px 26px 7px 11px}
-.pick::after{content:"";position:absolute;right:11px;top:50%;width:5px;height:5px;margin-top:-4px;border:solid var(--muted);
+  border:0;border-radius:10px;padding:8px 22px 7px 9px}
+.pick::after{content:"";position:absolute;right:9px;top:50%;width:5px;height:5px;margin-top:-4px;border:solid var(--muted);
   border-width:0 1.5px 1.5px 0;transform:rotate(45deg);pointer-events:none}
-.key{margin-left:auto;display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);white-space:nowrap}
+.key{margin-left:auto;display:flex;flex-direction:column;gap:2px;font-size:11.5px;color:var(--muted);white-space:nowrap}
 .key span{display:flex;align-items:center;gap:6px}
 .key i{width:14px;height:4px;border-radius:2px;display:inline-block}
 .info{width:22px;height:22px;border-radius:50%;border:0;background:var(--fill);color:var(--muted);font-size:12px;font-weight:700;
   padding:0;flex:none;margin-left:4px;font-style:italic}
-.attr{font-size:11px;color:var(--muted);margin:8px 2px 0}
+.attr{font-size:11px;color:var(--muted);margin:10px 2px 0}
+.attr p{margin:6px 0 0}
+.tog{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink)}
+.tog input{width:18px;height:18px;accent-color:var(--btn)}
 .attr a{color:inherit}
 
 .back{border:0;background:none;padding:2px 0 8px;font-weight:600;color:var(--accent)}
@@ -115,20 +118,24 @@ h1{font-size:17px;font-weight:700;margin:0 0 2px}
 
 <script>
 (() => {
-const MS_H = 36e5;
-const FROM = [[0,'Now'],[1,'1 h'],[3,'3 h'],[6,'6 h'],[12,'12 h'],[24,'1 d'],[48,'2 d']];
-const TO = [[1,'1 h'],[3,'3 h'],[6,'6 h'],[12,'12 h'],[24,'1 d'],[48,'2 d'],[72,'3 d'],[144,'6 d'],[168,'7 d']];
-const COL = {active:'var(--red)', window:'var(--orange)', later:'var(--later)'};
+const H = 36e5, DAY = 864e5;
+const STARTS = [[0,'Now'],[0.5,'+30 min'],[1,'+1 h'],[2,'+2 h'],[3,'+3 h'],[6,'+6 h'],[12,'+12 h'],[24,'+1 d']];
+const DURS = [[0.25,'15 min'],[0.5,'30 min'],[1,'1 h'],[2,'2 h'],[3,'3 h'],[4,'4 h'],[6,'6 h'],[12,'12 h'],[24,'1 d'],[48,'2 d'],[72,'3 d'],[120,'5 d'],[168,'7 d']];
+const COL = {ok:'var(--ok)', move:'var(--orange)', ban:'var(--red)'};
 const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
 const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DT = ['every day','weekdays','days before Sun/holiday','Sun/holidays','Mon to Sat'];
+const VEH = {'rörelsehindrade':'disabled permit holders','motorcykel':'motorcycles','cykel':'bicycles','beskickningsfordon':'diplomatic vehicles',
+  'buss':'buses','utryckningsfordon':'emergency vehicles','personbil':'specific cars','moped-klass2':'mopeds','moped-klass1':'mopeds','tung lastbil':'heavy lorries'};
 
 const store = {
   get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } },
   set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
 };
-let win = store.get('win', {from:0, to:24});
+let win = store.get('win2', {start:0, dur:2});
+let showReserved = store.get('showReserved', false);
 let rows = [], stamp = '', parked = store.get('parked', null);
-let view = 'filter', detailRows = [], detailTitle = '';
+let view = 'filter', detailRows = [], detailTitle = '', detailFrom = null, showInfo = false;
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
@@ -152,32 +159,22 @@ const meLayer = L.layerGroup().addTo(map);
 const parkLayer = L.layerGroup().addTo(map);
 
 /* ---------- data ---------- */
-const WD = {'söndag':0,'måndag':1,'tisdag':2,'onsdag':3,'torsdag':4,'fredag':5,'lördag':6};
 function dec(a){ const o=[]; let x=0,y=0; for(let i=0;i<a.length;i+=2){ x+=a[i]; y+=a[i+1]; o.push([y/1e5, x/1e5]); } return o; }
-function finish(o){
-  o.vfD = o.vf ? new Date(o.vf) : null; o.vtD = o.vt ? new Date(o.vt) : null;
-  let a=90,b=180,c=-90,d=-180;
-  for (const l of o.lines) for (const [la,ln] of l){ if(la<a)a=la; if(ln<b)b=ln; if(la>c)c=la; if(ln>d)d=ln; }
-  o.bb = [a,b,c,d]; return o;
-}
-function normalize(j){
-  if (j.f){
-    const t = j.t; stamp = j.stamp || '';
-    return j.f.map(r => finish({street:t.street[r[0]], dist:t.dist[r[1]], type:t.type[r[2]], rate:t.rate[r[3]], wd:r[4], st:r[5], et:r[6],
-      per:r[7]||null, oe:r[8], vf:r[9], vt:r[10], meter:r[11], pl:r[12], ref:r[13], lines:r[14].map(dec)}));
-  }
-  stamp = j.timeStamp || '';
-  return j.features.filter(f => WD[f.properties.START_WEEKDAY] !== undefined).map(f => {
-    const p = f.properties, g = f.geometry, m = /BeslutadAr=(\d+)&LopNr=(\d+)/.exec(p.RDT_URL || '');
-    const ls = g.type === 'LineString' ? [g.coordinates] : g.coordinates;
-    return finish({street:p.STREET_NAME||'', dist:p.CITY_DISTRICT||p.PARKING_DISTRICT||'', type:p.VF_PLATS_TYP||'', rate:p.PARKING_RATE||'',
-      wd:WD[p.START_WEEKDAY], st:p.START_TIME, et:p.END_TIME, per:p.START_MONTH?[p.START_MONTH,p.START_DAY,p.END_MONTH,p.END_DAY]:null,
-      oe:({'jämna veckor':2,'udda veckor':1})[p.ODD_EVEN]||0, vf:p.VALID_FROM||'', vt:p.VALID_TO||'', meter:p.VF_METER||0, pl:p.VF_PLATSER||0,
-      ref:m?m[1]+'-'+m[2]:'', lines:ls.map(l => l.map(c => [c[1], c[0]]))});
+function load(j){
+  const t = j.t; stamp = j.stamp || '';
+  return j.c.map((r, i) => {
+    const o = {i, street:t.street[r[0]], dist:t.dist[r[1]], zone:t.zone[r[2]], types:r[3].map(x => t.type[x]), rates:r[4].map(x => t.rate[x]),
+      veh:r[5], meter:r[6], pl:r[7], ref:r[8], vf:r[9], vt:r[10],
+      clean:r[11].map(c => ({wd:c[0], st:c[1], et:c[2], per:c[3]||null, oe:c[4]})),
+      max:r[12].map(m => ({mins:m[0], dt:m[1], st:m[2], et:m[3], per:m[4]||null})), lines:r[13].map(dec)};
+    o.reserved = !!o.veh;
+    let a=90,b=180,c=-90,d=-180;
+    for (const l of o.lines) for (const [la,ln] of l){ if(la<a)a=la; if(ln<b)b=ln; if(la>c)c=la; if(ln>d)d=ln; }
+    o.bb = [a,b,c,d]; return o;
   });
 }
 
-/* ---------- schedule ---------- */
+/* ---------- calendar helpers ---------- */
 function isoWeek(d){ const t=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())); const day=t.getUTCDay()||7;
   t.setUTCDate(t.getUTCDate()+4-day); const y0=new Date(Date.UTC(t.getUTCFullYear(),0,1)); return Math.ceil(((t-y0)/864e5+1)/7); }
 function inPeriod(per, d){ if(!per) return true; const md=(d.getMonth()+1)*100+d.getDate(), s=per[0]*100+per[1], e=per[2]*100+per[3];
@@ -198,146 +195,174 @@ function holidayName(d){
   }
   return hcache[y][d.toDateString()];
 }
-function nextOcc(r, now){
-  const base = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const off = (r.wd - base.getDay() + 7) % 7;
-  for (let i=0; i<60; i++){
-    const d = new Date(base.getFullYear(), base.getMonth(), base.getDate()+off+7*i);
-    const s = new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(r.st/100), r.st%100);
-    const e = new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(r.et/100), r.et%100);
-    if (r.vtD && s >= r.vtD) return null;
-    if (r.vfD && e <= r.vfD) continue;
-    if (!inPeriod(r.per, d)) continue;
-    if (r.oe && ((isoWeek(d)%2===0) !== (r.oe===2))) continue;
-    if (e > now) return {s, e, hol: holidayName(d)};
-  }
-  return null;
-}
-function classify(r, now){
-  const n = r.next = nextOcc(r, now);
-  if (!n) return 'later';
-  if (n.s <= now) return 'active';
-  const dh = (n.s - now) / MS_H;
-  if (dh < win.from) return 'later';
-  if (dh <= win.to) return 'window';
-  return 'later';
+const day0 = t => { const d = new Date(t); return new Date(d.getFullYear(), d.getMonth(), d.getDate()); };
+const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate()+n);
+const at = (d, hhmm) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), Math.floor(hhmm/100), hhmm%100);
+const isHelg = d => d.getDay() === 0 || !!holidayName(d);
+function dayMatch(dt, d){
+  if (!dt) return true;
+  const helg = isHelg(d), nextHelg = isHelg(addDays(d,1));
+  return dt === 1 ? !helg && !nextHelg : dt === 2 ? !helg && nextHelg : dt === 3 ? helg : !helg;
 }
 
-/* ---------- render ---------- */
-const STY = {
-  active:{weight:6, opacity:1},
-  window:{weight:4, opacity:1},
-  later:{weight:2.5, opacity:.4}
-};
-let counts = {};
-const zf = () => { const z = map.getZoom(); return z <= 12 ? .55 : z === 13 ? .7 : z === 14 ? .85 : 1; };
-let lastZf = null;
-map.on('zoomend', () => { if (rows.length && zf() !== lastZf){ lastZf = zf(); restyle(true); } });
-function restyle(force){
-  const now = new Date(); counts = {active:0, window:0, later:0};
-  const colors = {active:cssVar('--red'), window:cssVar('--orange'), later:cssVar('--later')};
-  for (const r of rows){
-    const c = classify(r, now); counts[c]++;
-    if (force || c !== r.cat){
-      r.cat = c;
-      r.layer.setStyle({color:colors[c], opacity:STY[c].opacity, weight:STY[c].weight*zf()});
-      if (c === 'window') r.layer.bringToFront();
+/* ---------- rules engine ---------- */
+// Returns {ban:{until,why}} | {move:{at,why}} | {} for parking from a to b
+function evaluate(c, a, b){
+  let ban = null, move = null;
+  const first = addDays(day0(a), -1), last = day0(b);
+  for (const r of c.clean){
+    for (let d = first; d <= last; d = addDays(d,1)){
+      if (d.getDay() !== r.wd || !inPeriod(r.per, d)) continue;
+      if (r.oe && ((isoWeek(d)%2===0) !== (r.oe===2))) continue;
+      const s = at(d, r.st), e = at(d, r.et);
+      if (s <= a && e > a){ if (!ban || e > ban.until) ban = {until:e, why:'cleaning'}; }
+      else if (s > a && s < b && (!move || s < move.at)) move = {at:s, why:'cleaning starts'};
     }
   }
-  for (const r of rows) if (r.cat === 'active') r.layer.bringToFront();
+  for (const m of c.max){
+    const periods = [];
+    for (let d = first; d <= last; d = addDays(d,1)){
+      if (!dayMatch(m.dt, d) || !inPeriod(m.per, d)) continue;
+      const s = at(d, m.st), e = m.et > m.st ? at(d, m.et) : at(addDays(d,1), m.et);
+      const p = periods[periods.length-1];
+      if (p && s <= p[1]) p[1] = new Date(Math.max(p[1], e)); else periods.push([s, e]);
+    }
+    for (const [s, e] of periods){
+      const os = Math.max(a, s), oe = Math.min(b, e);
+      if (oe - os > m.mins*6e4){
+        const t = new Date(os + m.mins*6e4);
+        if (!move || t < move.at) move = {at:t, why:`${limitText(m.mins)} limit`};
+      }
+    }
+  }
+  return ban ? {ban} : move ? {move} : {};
+}
+function windowNow(){ const a = new Date(Date.now() + win.start*H); return [a, new Date(+a + win.dur*H)]; }
+function status(c, a, b){ const v = evaluate(c, a, b); return v.ban ? 'ban' : v.move ? 'move' : 'ok'; }
+
+/* ---------- render map ---------- */
+const STY = {ok:{weight:3, opacity:.85}, move:{weight:4, opacity:1}, ban:{weight:4, opacity:1}};
+function restyle(force){
+  const [a, b] = windowNow();
+  const colors = {ok:cssVar('--ok'), move:cssVar('--orange'), ban:cssVar('--red')};
+  for (const r of rows){
+    const hide = r.reserved && !showReserved;
+    if (hide){ if (r.on){ map.removeLayer(r.layer); r.on = false; } continue; }
+    if (!r.on){ r.layer.addTo(map); r.on = true; force = true; }
+    const c = status(r, a, b);
+    if (force || c !== r.cat){ r.cat = c; r.layer.setStyle({color:colors[c], ...STY[c]}); }
+  }
+  for (const r of rows) if (r.on && r.cat === 'move') r.layer.bringToFront();
+  for (const r of rows) if (r.on && r.cat === 'ban') r.layer.bringToFront();
   render();
 }
 
 /* ---------- formatting ---------- */
 const pad = n => String(n).padStart(2,'0');
-const hm = t => pad(Math.floor(t/100)) + ':' + pad(t%100);
+const hm = t => pad(Math.floor(t/100)%24) + ':' + pad(t%100);
+const clock = d => pad(d.getHours()) + ':' + pad(d.getMinutes());
 const dayStr = d => `${DAYS[d.getDay()].slice(0,3)} ${d.getDate()} ${MON[d.getMonth()]}`;
-function until(ms){
-  const m = Math.round(ms/6e4);
-  if (m < 60) return `${m} min`;
-  const h = Math.floor(m/60);
-  if (h < 24) return `${h} h ${m%60} min`;
-  return `${Math.floor(h/24)} d ${h%24} h`;
+function when(d){
+  const t = day0(Date.now());
+  const dd = Math.round((day0(d) - t)/DAY);
+  return (dd === 0 ? 'today' : dd === 1 ? 'tomorrow' : dayStr(d)) + ' ' + clock(d);
 }
-function ruleText(r){
-  let t = `Every ${DAYS[r.wd]} ${hm(r.st)} to ${hm(r.et)}`;
-  if (r.oe) t += r.oe === 2 ? ', even weeks' : ', odd weeks';
-  if (r.per) t += `, ${r.per[1]} ${MON[r.per[0]-1]} to ${r.per[3]} ${MON[r.per[2]-1]}`;
-  else t += ', all year';
-  return t;
+function limitText(mins){ return mins % 60 ? `${mins} min` : `${mins/60} h`; }
+const perText = per => per ? `, ${per[1]} ${MON[per[0]-1]} to ${per[3]} ${MON[per[2]-1]}` : '';
+const cleanText = r => `${DAYS[r.wd]}s ${hm(r.st)} to ${hm(r.et)}${r.oe ? (r.oe===2?', even weeks':', odd weeks') : ''}${perText(r.per)}`;
+const maxText = m => `Max ${limitText(m.mins)}, ${DT[m.dt]}${m.st===0 && m.et===2400 ? '' : ' ' + hm(m.st) + ' to ' + hm(m.et)}${perText(m.per)}`;
+function feeText(c){
+  const t = c.rates.map(r => r === 'avgiftsfri' ? 'Free' : r.split(/,?\s*Boende:/)[0].replace(/^taxa (\d+):\s*/,'Taxa $1: ')).filter(Boolean);
+  return [...new Set(t)].join('; ') || 'Not specified';
+}
+function residentText(c){
+  if (c.types.includes('P Avgift, boende')){
+    const m = c.rates.map(r => /Boende:\s*(.+)$/.exec(r)).find(Boolean);
+    return `Allowed with permit for ${c.zone || 'this area'}${m ? ': ' + m[1] : ''}`;
+  }
+  if (c.types.includes('P-avgift endast besök')) return 'Not allowed, visitors only';
+  if (c.types.includes('Avgiftsfri parkering')) return 'Free for everyone';
+  return 'No resident parking';
 }
 const rdt = ref => { const [y,n] = ref.split('-'); return `https://rdt.transportstyrelsen.se/rdt/AF06_View.aspx?BeslutsMyndighetKod=0180&BeslutadAr=${y}&LopNr=${n}`; };
-const hourLabel = h => (FROM.find(x=>x[0]===h) || TO.find(x=>x[0]===h) || [0,h+' h'])[1];
 
 /* ---------- views ---------- */
 function render(){ view === 'filter' ? renderFilter() : renderDetail(); }
-function opts(list, key){
-  return list.map(([h,l]) => {
-    const dis = key==='to' ? h <= win.from : h >= win.to;
-    return `<option value="${h}" ${win[key]===h?'selected':''} ${dis?'disabled':''}>${l}</option>`;
-  }).join('');
-}
-let showAttr = false;
+const opts = (list, cur) => list.map(([h,l]) => `<option value="${h}" ${cur===h?'selected':''}>${l}</option>`).join('');
 function renderFilter(){
   const pt = parked ? new Date(parked.t) : null;
   $('body').innerHTML = `
     <div class="bar">
-      <label class="pick"><select data-k="from" aria-label="From">${opts(FROM,'from')}</select></label><span class="to">to</span>
-      <label class="pick"><select data-k="to" aria-label="To">${opts(TO,'to')}</select></label>
-      <div class="key"><span><i style="background:${COL.active}"></i>Ban now</span><span><i style="background:${COL.window}"></i>Ban during window</span></div>
-      <button class="info" data-act="attr" aria-label="Map credits">i</button>
+      <label class="pick"><select data-k="start" aria-label="Arrive">${opts(STARTS, win.start)}</select></label><span class="to">for</span>
+      <label class="pick"><select data-k="dur" aria-label="Stay">${opts(DURS, win.dur)}</select></label>
+      <div class="key"><span><i style="background:${COL.ok}"></i>OK</span><span><i style="background:${COL.move}"></i>Must move</span><span><i style="background:${COL.ban}"></i>Not now</span></div>
+      <button class="info" data-act="info" aria-label="Settings and credits">i</button>
     </div>
-    ${showAttr ? '<p class="attr">© <a href="https://stadiamaps.com/">Stadia Maps</a> © <a href="https://openmaptiles.org/">OpenMapTiles</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>. Data: Stockholms stad</p>' : ''}
-    ${parked ? `<p class="msg">Car parked ${dayStr(pt)} ${pad(pt.getHours())}:${pad(pt.getMinutes())}. <button class="back" data-act="showpark" style="padding:0">Show cleaning times</button></p>` : ''}`;
+    ${showInfo ? `<div class="attr">
+      <label class="tog"><input type="checkbox" data-act="reserved" ${showReserved?'checked':''}> Show reserved spaces</label>
+      <p>Map © <a href="https://stadiamaps.com/">Stadia Maps</a> © <a href="https://openmaptiles.org/">OpenMapTiles</a> © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>. Data: Stockholms stad${stamp ? ', ' + stamp.slice(0,10) : ''}</p></div>` : ''}
+    ${parked ? `<p class="msg">Car parked ${dayStr(pt)} ${clock(pt)}. <button class="back" data-act="showpark" style="padding:0">Check this spot</button></p>` : ''}`;
 }
-function segHtml(r, now, extra){
-  const n = r.next, c = r.cat;
-  let when, cnt;
-  if (!n){ when = 'No upcoming cleaning found'; cnt = ''; }
-  else if (c === 'active'){ when = `Ban in force until ${hm(r.et)}`; cnt = `Ends in ${until(n.e - now)}`; }
-  else { when = `${dayStr(n.s)}, ${hm(r.st)} to ${hm(r.et)}`; cnt = `Starts in ${until(n.s - now)}`; }
+function verdictHtml(c, a){
+  const [wa, wb] = detailFrom ? [a, new Date(+a + 7*DAY)] : windowNow();
+  const v = evaluate(c, a, new Date(+a + 7*DAY));
+  const inWin = detailFrom ? (v.ban ? 'ban' : v.move ? 'move' : 'ok') : status(c, wa, wb);
+  let head, sub;
+  if (v.ban){
+    const after = evaluate(c, v.ban.until, new Date(+v.ban.until + 7*DAY));
+    head = `No parking until ${when(v.ban.until)}`;
+    sub = `Cleaning in progress${after.move ? `. Then OK until ${when(after.move.at)}` : ''}`;
+  } else if (v.move){
+    head = `${detailFrom ? 'Move by' : 'OK until'} ${when(v.move.at)}`;
+    sub = `Then ${v.move.why}`;
+  } else { head = 'OK for 7 days'; sub = 'No restriction found in the next 7 days'; }
+  return {cat:inWin, html:`<p class="when" style="color:${inWin==='ok'?'var(--ink)':COL[inWin]}">${head}</p><p class="sub">${sub}</p>`, move: v.move || (v.ban ? {at:v.ban.until} : null)};
+}
+function segHtml(c, extra){
+  const a = detailFrom ? new Date(detailFrom) : windowNow()[0];
+  const V = verdictHtml(c, a);
   const facts = [
-    ['Rule', ruleText(r)],
-    ['Parking', r.type || 'Not specified'],
-    ['Taxa', r.rate ? r.rate.charAt(0).toUpperCase() + r.rate.slice(1) : 'Not specified'],
-    r.meter ? ['Length', r.meter + ' m'] : null,
-    r.pl ? ['Spaces', r.pl] : null,
-    r.vt ? ['Valid until', new Date(r.vt).toLocaleDateString('en-GB')] : null
+    c.reserved ? ['Reserved', 'Only for ' + (VEH[c.veh] || c.veh)] : null,
+    ['Fee', feeText(c)],
+    ['Residents', residentText(c)],
+    ...c.max.map(m => ['Time limit', maxText(m)]),
+    ...c.clean.map(r => ['Cleaning', cleanText(r)]),
+    c.types.includes('Tidsreglerat parkerings-/stoppförbud') ? ['Note', 'Time-restricted no parking; times shown as cleaning'] : null,
+    c.pl ? ['Spaces', c.pl] : c.meter ? ['Length', c.meter + ' m'] : null
   ].filter(Boolean);
-  return `<article class="seg cat-${c}" style="border-color:${COL[c]}">
-    <span class="plate">${esc(r.street || 'Unnamed street')}</span><span class="dist">${esc(r.dist)}</span>
-    <p class="when">${when}</p><p class="count sub">${cnt}${extra||''}</p>
-    ${n && n.hol ? `<span class="warn">${n.hol}: check the sign whether the ban applies</span>` : ''}
+  return `<article class="seg" style="border-color:${COL[V.cat]}">
+    <span class="plate">${esc(c.street || 'Unnamed street')}</span><span class="dist">${esc(c.dist)}${extra||''}</span>
+    ${V.html}
     <dl class="facts">${facts.map(([k,v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
     <div class="acts">
-      ${n ? `<button class="btn primary" data-act="ics" data-i="${r.i}">Add reminder</button>` : ''}
-      <a class="btn" href="${rdt(r.ref)}" target="_blank" rel="noopener">Regulation ${esc(r.ref)}</a>
+      ${V.move && !V.html.includes('No parking until') ? `<button class="btn primary" data-act="ics" data-i="${c.i}">Remind me to move</button>` : ''}
+      <a class="btn" href="${rdt(c.ref)}" target="_blank" rel="noopener">Regulation</a>
     </div></article>`;
 }
 function renderDetail(){
-  const now = new Date();
-  $('body').innerHTML = `<button class="back" data-act="back">Back to filter</button>
-    ${detailTitle ? `<h1>${detailTitle}</h1><p class="sub" style="margin-bottom:12px">Each side of a street can have its own day</p>` : ''}
-    ${detailRows.length ? detailRows.map(r => segHtml(r, now, (r._d != null ? `, ${Math.round(r._d)} m away` : '') + (r._n > 1 ? `, applies to ${r._n} stretches` : ''))).join('') :
-      '<p class="msg">No cleaning stretches within 30 m. Move the pin closer to the curb or tap the street on the map.</p>'}`;
+  $('body').innerHTML = `<button class="back" data-act="back">Back</button>
+    ${detailTitle ? `<h1>${detailTitle}</h1>` : ''}
+    ${detailRows.length ? detailRows.map(c => segHtml(c, (c._d != null ? `, ${Math.round(c._d)} m away` : '') + (c._n > 1 ? `, ${c._n} stretches` : ''))).join('') :
+      '<p class="msg">No regulated parking within 30 m.</p>'}
+    ${view === 'detail' && detailFrom ? '<div class="acts"><button class="btn" data-act="unpark">Clear parked car</button></div>' : ''}`;
 }
-function openDetail(list, title){
-  view = 'detail'; detailRows = list; detailTitle = title || '';
-  $('sheet').classList.remove('min');
+function openDetail(list, title, from){
+  view = 'detail'; detailRows = list; detailTitle = title || ''; detailFrom = from || null;
   selLayer.clearLayers();
-  for (const r of list){
-    L.polyline(r.lines, {renderer, interactive:false, color:cssVar('--bg'), weight:12, opacity:.95}).addTo(selLayer);
-    L.polyline(r.lines, {renderer, interactive:false, color:cssVar(({active:'--red',window:'--orange'})[r.cat] || '--ink'), weight:7}).addTo(selLayer);
+  for (const c of list){
+    L.polyline(c.lines, {renderer, interactive:false, color:cssVar('--bg'), weight:12, opacity:.95}).addTo(selLayer);
+    L.polyline(c.lines, {renderer, interactive:false, color:cssVar(({ok:'--ok',move:'--orange',ban:'--red'})[c.cat] || '--ink'), weight:6}).addTo(selLayer);
   }
   render(); $('body').scrollTop = 0;
 }
-function closeDetail(){ view = 'filter'; selLayer.clearLayers(); render(); }
+function closeDetail(){ view = 'filter'; detailFrom = null; selLayer.clearLayers(); render(); }
 
 /* ---------- hit testing ---------- */
 function near(ll, meters){
   const kx = Math.cos(ll.lat*Math.PI/180)*111320, ky = 110540;
   const dLat = meters/ky, dLng = meters/kx, out = [];
   for (const r of rows){
+    if (!r.on) continue;
     const b = r.bb;
     if (ll.lat < b[0]-dLat || ll.lat > b[2]+dLat || ll.lng < b[1]-dLng || ll.lng > b[3]+dLng) continue;
     let best = Infinity;
@@ -345,13 +370,12 @@ function near(ll, meters){
       const ax=(l[i-1][1]-ll.lng)*kx, ay=(l[i-1][0]-ll.lat)*ky, bx=(l[i][1]-ll.lng)*kx, by=(l[i][0]-ll.lat)*ky;
       const dx=bx-ax, dy=by-ay, L2=dx*dx+dy*dy;
       let t = L2 ? -(ax*dx+ay*dy)/L2 : 0; t = Math.max(0, Math.min(1, t));
-      const px=ax+t*dx, py=ay+t*dy, d=Math.hypot(px,py);
+      const d = Math.hypot(ax+t*dx, ay+t*dy);
       if (d < best) best = d;
     }
     if (best <= meters){ r._d = best; r._n = null; out.push(r); }
   }
-  const rank = {active:0, window:1, later:2};
-  return out.sort((a,b) => (a._d - b._d) || (rank[a.cat]-rank[b.cat])).slice(0, 8);
+  return out.sort((a,b) => a._d - b._d).slice(0, 8);
 }
 map.on('click', e => {
   const mpp = 40075016.686*Math.cos(e.latlng.lat*Math.PI/180)/Math.pow(2, map.getZoom()+8);
@@ -367,24 +391,24 @@ $('q').addEventListener('input', () => {
   const q = $('q').value.trim().toLowerCase();
   if (q.length < 2){ $('results').innerHTML = ''; return; }
   const m = streets.filter(s => s.k.includes(q)).sort((a,b) => (b.k.startsWith(q)) - (a.k.startsWith(q)) || a.k.localeCompare(b.k)).slice(0, 8);
-  $('results').innerHTML = m.map((s,i) => `<li><button data-s="${streets.indexOf(s)}">${esc(s.name)} <small>${esc(s.dists)}</small></button></li>`).join('')
+  $('results').innerHTML = m.map(s => `<li><button data-s="${streets.indexOf(s)}">${esc(s.name)} <small>${esc(s.dists)}</small></button></li>`).join('')
     || '<li><button disabled>No street matches</button></li>';
 });
 $('results').addEventListener('click', e => {
   const b = e.target.closest('button[data-s]'); if (!b) return;
   const s = streets[+b.dataset.s];
-  const list = rows.filter(r => r.street === s.name);
+  const list = rows.filter(r => r.on && r.street === s.name);
   $('results').innerHTML = ''; $('q').value = s.name; $('q').blur();
-  const rank = {active:0,window:1,later:2}, groups = new Map();
+  if (!list.length) return;
+  const rank = {ok:0, move:1, ban:2}, groups = new Map();
   for (const r of list){
-    const k = [r.wd,r.st,r.et,r.per,r.oe,r.rate,r.type,r.dist].join('|');
+    const k = JSON.stringify([r.dist, r.zone, r.types, r.rates, r.clean, r.max, r.veh]);
     if (!groups.has(k)) groups.set(k, {r, n:0}); groups.get(k).n++;
   }
   const cards = [...groups.values()].map(g => { g.r._d = null; g.r._n = g.n; return g.r; }).sort((a,b) => rank[a.cat]-rank[b.cat]);
-  openDetail(cards, `${esc(s.name)}: ${list.length} stretches, ${cards.length} distinct rules`);
+  openDetail(cards);
   L.polyline(list.flatMap(r => r.lines), {renderer, interactive:false, color:cssVar('--bg'), weight:12, opacity:.95}).addTo(selLayer).bringToBack();
-  const bounds = L.latLngBounds(list.flatMap(r => r.lines.flat()));
-  map.fitBounds(bounds, {paddingTopLeft:[20,80], paddingBottomRight:[20, $('sheet').offsetHeight + 20], maxZoom:17});
+  map.fitBounds(L.latLngBounds(list.flatMap(r => r.lines.flat())), {paddingTopLeft:[20,80], paddingBottomRight:[20, $('sheet').offsetHeight + 20], maxZoom:17});
 });
 
 /* ---------- location ---------- */
@@ -405,55 +429,56 @@ $('locate').addEventListener('click', () => {
     flash(err.code === 1 ? 'Location is blocked. Allow it in Settings, Privacy, Location Services, Safari Websites.' : 'Could not get your location. Try again outdoors.');
   }, {enableHighAccuracy:true, maximumAge:10000, timeout:20000});
 });
-function flash(t){ if (view !== 'filter') closeDetail(); $('sheet').classList.remove('min'); $('body').insertAdjacentHTML('afterbegin', `<p class="msg" style="color:var(--red);margin:0 0 8px">${esc(t)}</p>`); }
+function flash(t){ if (view !== 'filter') closeDetail(); $('body').insertAdjacentHTML('afterbegin', `<p class="msg" style="color:var(--red);margin:0 0 8px">${esc(t)}</p>`); }
 
 /* ---------- parked car ---------- */
 function drawPark(){
   parkLayer.clearLayers(); $('park').classList.toggle('on', !!parked);
   if (!parked) return;
   L.marker([parked.lat, parked.lng], {interactive:false, icon:L.divIcon({className:'', iconSize:[30,30], iconAnchor:[15,15],
-    html:'<div style="width:30px;height:30px;border-radius:6px;background:#2d3135;color:#fff;font-weight:700;display:grid;place-items:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);font-family:-apple-system,sans-serif">P</div>'})}).addTo(parkLayer);
+    html:'<div style="width:30px;height:30px;border-radius:9px;background:#2d3135;color:#fff;font-weight:700;display:grid;place-items:center;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);font-family:-apple-system,sans-serif">P</div>'})}).addTo(parkLayer);
 }
 function showParked(){
   const ll = L.latLng(parked.lat, parked.lng);
   map.setView(ll, Math.max(map.getZoom(), 17));
-  openDetail(near(ll, 30), 'Cleaning near your car');
-  $('body').insertAdjacentHTML('beforeend', '<div class="acts"><button class="btn" data-act="unpark">Clear parked car</button></div>');
+  openDetail(near(ll, 30), 'Your car', parked.t);
 }
 $('park').addEventListener('click', () => {
   if (parked){ showParked(); return; }
   const ll = me || map.getCenter();
-  parked = {lat:ll.lat, lng:ll.lng, t:Date.now(), src: me ? 'gps' : 'map'};
+  parked = {lat:ll.lat, lng:ll.lng, t:Date.now()};
   store.set('parked', parked); drawPark(); showParked();
   if (!me) $('body').insertAdjacentHTML('afterbegin', '<p class="msg" style="margin:0 0 8px">Saved at the map centre. Tap the location button first to use GPS.</p>');
 });
 
 /* ---------- calendar reminder ---------- */
 function icsDate(d){ return d.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,''); }
-function makeIcs(r){
-  const n = r.next, uid = `${r.ref}-${n.s.getTime()}@street-cleaning`;
-  const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//street-cleaning//EN','METHOD:PUBLISH','BEGIN:VEVENT',
-    `UID:${uid}`, `DTSTAMP:${icsDate(new Date())}`, `DTSTART:${icsDate(n.s)}`, `DTEND:${icsDate(n.e)}`,
-    `SUMMARY:Move car: street cleaning ${r.street}`, `LOCATION:${r.street}, ${r.dist}`,
-    `DESCRIPTION:${ruleText(r)}. Regulation 0180 ${r.ref}.`,
+function makeIcs(c){
+  const a = detailFrom ? new Date(detailFrom) : windowNow()[0];
+  const v = evaluate(c, a, new Date(+a + 7*DAY)); if (!v.move) return;
+  const t = v.move.at;
+  const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//parking//EN','METHOD:PUBLISH','BEGIN:VEVENT',
+    `UID:${c.ref}-${+t}@parking`, `DTSTAMP:${icsDate(new Date())}`, `DTSTART:${icsDate(new Date(+t - 30*6e4))}`, `DTEND:${icsDate(t)}`,
+    `SUMMARY:Move car, ${c.street}`, `LOCATION:${c.street}, ${c.dist}`, `DESCRIPTION:${v.move.why} at ${clock(t)}.`,
     'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:Move car','TRIGGER:-PT12H','END:VALARM',
-    'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:Move car','TRIGGER:-PT1H','END:VALARM',
+    'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:Move car','TRIGGER:-PT30M','END:VALARM',
     'END:VEVENT','END:VCALENDAR'];
   const blob = new Blob([lines.join('\r\n')], {type:'text/calendar'});
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `street-cleaning-${r.street.replace(/\W+/g,'-')}.ics`;
-  document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+  const el = document.createElement('a'); el.href = URL.createObjectURL(blob); el.download = `move-car-${c.street.replace(/\W+/g,'-')}.ics`;
+  document.body.appendChild(el); el.click(); setTimeout(() => { URL.revokeObjectURL(el.href); el.remove(); }, 2000);
 }
 
 /* ---------- sheet events ---------- */
 $('body').addEventListener('change', e => {
-  const c = e.target.closest('select[data-k]'); if (!c) return;
-  win[c.dataset.k] = +c.value; store.set('win', win); restyle();
+  const c = e.target.closest('select[data-k]');
+  if (c){ win[c.dataset.k] = +c.value; store.set('win2', win); restyle(); return; }
+  if (e.target.dataset.act === 'reserved'){ showReserved = e.target.checked; store.set('showReserved', showReserved); restyle(); }
 });
 $('body').addEventListener('click', e => {
-  const a = e.target.closest('[data-act]'); if (!a) return;
+  const a = e.target.closest('[data-act]'); if (!a || a.tagName === 'INPUT') return;
   const act = a.dataset.act;
   if (act === 'back') closeDetail();
-  if (act === 'attr'){ showAttr = !showAttr; render(); }
+  if (act === 'info'){ showInfo = !showInfo; render(); }
   if (act === 'ics') makeIcs(rows[+a.dataset.i]);
   if (act === 'showpark') showParked();
   if (act === 'unpark'){ parked = null; store.set('parked', null); drawPark(); closeDetail(); }
@@ -461,14 +486,14 @@ $('body').addEventListener('click', e => {
 
 /* ---------- boot ---------- */
 fetch('data.json').then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(j => {
-  rows = normalize(j);
-  rows.forEach((r,i) => { r.i = i; r.layer = L.polyline(r.lines, {renderer, interactive:false, lineCap:'round'}).addTo(map); });
+  rows = load(j);
+  rows.forEach(r => { r.layer = L.polyline(r.lines, {renderer, interactive:false, lineCap:'round'}); r.on = false; });
   const by = {};
   for (const r of rows){ if (!r.street) continue; (by[r.street] ||= new Set()).add(r.dist); }
-  streets = Object.entries(by).map(([name, d]) => ({name, k:name.toLowerCase(), dists:[...d].slice(0,3).join(', ')}));
+  streets = Object.entries(by).map(([name, d]) => ({name, k:name.toLowerCase(), dists:[...d].filter(Boolean).slice(0,3).join(', ')}));
   restyle(true); drawPark();
   $('loading').remove();
-  setInterval(() => { restyle(); }, 60000);
+  setInterval(() => restyle(), 60000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) restyle(); });
 }).catch(err => { $('loading').textContent = 'Street data failed to load (' + err.message + '). Check that data.json sits next to index.html.'; });
 

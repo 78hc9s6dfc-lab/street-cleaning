@@ -12,6 +12,6 @@
 3. Open from the home screen icon, tap the location button, allow location
 
 ## Refresh data
-- Run the Shortcut again to download `servicedagar.json`
-- Rename it to `data.json` and upload it to the repo, replacing the old file (the app reads both the raw city format and the compressed one)
-- Optional: run `python3 prep.py` on the raw file first to shrink it from c.11 MB to c.1.3 MB
+- Download `ptillaten/all` and `servicedagar/all` with the Shortcut (same URL pattern, swap the dataset name)
+- On a computer: `python3 prep.py ptillaten.json servicedagar.json` creates a new `data.json`
+- Upload `data.json` to the repo, replacing the old one

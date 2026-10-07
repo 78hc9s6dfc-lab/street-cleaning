@@ -1,4 +1,4 @@
-const APP = 'app-v7', TILES = 'tiles-v6', MAX_TILES = 2500;
+const APP = 'app-v8', TILES = 'tiles-v8', MAX_TILES = 2500;
 const SHELL = ['./', 'index.html', 'data.json', 'manifest.webmanifest', 'apple-touch-icon.png', 'icon-192.png',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css',
   'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'];
